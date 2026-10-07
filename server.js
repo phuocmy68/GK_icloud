@@ -2,8 +2,6 @@ const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 require('dotenv').config();
-// ... các đoạn code phía dưới giữ nguyên
-require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const MongoStore = require('connect-mongo').default || require('connect-mongo');
@@ -11,6 +9,8 @@ const { engine } = require('express-handlebars');
 const { BookRead, BookWrite } = require('./models/Book');
 
 const app = express();
+
+// Body parser - Xử lý dữ liệu gửi từ Form
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -19,9 +19,9 @@ app.engine('handlebars', engine());
 app.set('view engine', 'handlebars');
 app.set('views', './views');
 
-// 2. Cấu hình Stateless Session lưu trữ tập trung trên MongoDB Atlas
+// 2. Cấu hình Stateless Session lưu trữ tập trung trên MongoDB Atlas (Ghi bằng Write URI)
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'MySuperSecretKey2026',
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
@@ -31,23 +31,24 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 } // 1 giờ
 }));
 
-// Tính toán tham số cá nhân
-const mssv = process.env.MSSV || '211234567';
-const lastDigit = parseInt(mssv.slice(-1));
-const vatRate = lastDigit + 6; // Thuế VAT (%)
-const mssvPrefix = mssv.slice(-3); // 3 số cuối MSSV
+// 3. Tính toán tham số cá nhân từ MSSV
+const mssv = process.env.MSSV || '23IT169';
+const lastDigit = parseInt(mssv.slice(-1)) || 0;
+const vatRate = lastDigit + 6; // 9 + 6 = 15%
+const mssvPrefix = mssv.slice(-3); // '169'
 
-// Truyền biến cho layout Handlebars
+// 4. Middleware truyền biến sinh viên mặc định sang tất cả View Handlebars
 app.use((req, res, next) => {
-  res.locals.studentInfo = {
-    hoTen: process.env.HO_TEN || 'Nguyễn Văn A',
-    mssv: mssv,
-    vatRate: vatRate
-  };
+  const hoTen = process.env.HO_TEN || 'Van Thi Phuoc My';
+  res.locals.HO_TEN = hoTen;
+  res.locals.MSSV = mssv;
+  res.locals.vatRate = vatRate;
+  res.locals.vatPercent = vatRate;
+  res.locals.studentInfo = { hoTen, mssv, vatRate };
   next();
 });
 
-// Route GET: Đọc danh sách sách (Điều hướng vào Read Account)
+// 5. Route GET: Đọc danh sách sách (Dùng tài khoản Read)
 app.get('/books', async (req, res) => {
   try {
     const books = await BookRead.find().lean();
@@ -57,17 +58,20 @@ app.get('/books', async (req, res) => {
   }
 });
 
-// Route POST: Thêm mới sách (Điều hướng vào Write Account)
+// 6. Route POST: Thêm mới sách (Dùng tài khoản Write)
 app.post('/books', async (req, res) => {
-  const { bookCode, title, basePrice } = req.body;
+  // Lấy dữ liệu linh hoạt (tự tương thích cả maSach/tenSach/giaGoc lẫn bookCode/title/basePrice)
+  const bookCode = req.body.bookCode || req.body.maSach;
+  const title = req.body.title || req.body.tenSach;
+  const basePrice = req.body.basePrice || req.body.giaGoc;
 
-  // Kiểm tra bộ lọc tiền tố Mã sách
-  if (!bookCode.startsWith(mssvPrefix)) {
-    return res.status(400).send(`Lỗi: Mã sản phẩm phải bắt đầu bằng 3 số cuối MSSV (${mssvPrefix})`);
+  // Kiểm tra bộ lọc tiền tố Mã sách (bắt buộc bắt đầu bằng 169)
+  if (!bookCode || !bookCode.startsWith(mssvPrefix)) {
+    return res.status(400).send(`Lỗi Validation: Mã sách phải bắt đầu bằng 3 số cuối MSSV (${mssvPrefix})`);
   }
 
-  // Tính giá sau thuế
-  const price = parseFloat(basePrice);
+  // Tính giá sau thuế (VAT 15%)
+  const price = parseFloat(basePrice) || 0;
   const finalPrice = price + (price * (vatRate / 100));
 
   try {
@@ -84,6 +88,8 @@ app.post('/books', async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log(`Server running on port ${process.env.PORT || 3000}`);
+// 7. Khởi chạy Server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
