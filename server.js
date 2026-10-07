@@ -1,7 +1,12 @@
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '1.1.1.1']);
+
+require('dotenv').config();
+// ... các đoạn code phía dưới giữ nguyên
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const MongoStore = require('connect-mongo').default || require('connect-mongo');
 const { engine } = require('express-handlebars');
 const { BookRead, BookWrite } = require('./models/Book');
 
@@ -20,7 +25,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
-    mongoUrl: process.env.MONGO_READ_URI,
+    mongoUrl: process.env.MONGO_WRITE_URI,
     collectionName: 'sessions'
   }),
   cookie: { maxAge: 1000 * 60 * 60 } // 1 giờ
