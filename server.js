@@ -9,6 +9,10 @@ const { engine } = require('express-handlebars');
 const { BookRead, BookWrite } = require('./models/Book');
 
 const app = express();
+// Tự động chuyển hướng từ trang chủ '/' sang '/books'
+app.get('/', (req, res) => {
+  res.redirect('/books');
+});
 
 // Body parser - Xử lý dữ liệu gửi từ Form
 app.use(express.urlencoded({ extended: true }));
